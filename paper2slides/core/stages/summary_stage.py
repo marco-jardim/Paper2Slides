@@ -28,6 +28,7 @@ async def run_summary_stage(base_dir: Path, config: Dict) -> Dict:
     
     api_key = os.getenv("RAG_LLM_API_KEY", "")
     base_url = os.getenv("RAG_LLM_BASE_URL")
+    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
     llm_client = OpenAI(api_key=api_key, base_url=base_url)
     
     logger.info(f"Extracting content from indexed documents ({content_type})...")
@@ -41,7 +42,7 @@ async def run_summary_stage(base_dir: Path, config: Dict) -> Dict:
             paper_metadata = await extract_paper_metadata_from_markdown(
                 markdown_paths=markdown_paths,
                 llm_client=llm_client,
-                model="gpt-4o-mini",
+                model=model,
                 max_chars_per_file=3000
             )
             

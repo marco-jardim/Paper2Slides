@@ -292,7 +292,7 @@ class ContentPlanner:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": content}],
-                max_tokens=16000,
+                max_tokens=8192, // This restriction by deepseek. May be we should use env
             )
             result = response.choices[0].message.content or ""
             logger.info(f"LLM returned {len(result)} characters")
