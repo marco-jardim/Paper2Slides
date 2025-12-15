@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
+import requests
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -83,12 +84,31 @@ class ImageGenerator:
         self,
         api_key: str = None,
         base_url: str = None,
-        model: str = "google/gemini-3-pro-image-preview",
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
+        response_mime_type: Optional[str] = None,
+        google_api_base_url: Optional[str] = None,
     ):
+        self.provider = (provider or os.getenv("IMAGE_GEN_PROVIDER", "openrouter")).lower()
         self.api_key = api_key or os.getenv("IMAGE_GEN_API_KEY", "")
         self.base_url = base_url or os.getenv("IMAGE_GEN_BASE_URL", "https://openrouter.ai/api/v1")
-        self.model = model
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        self.google_api_base_url = (google_api_base_url or os.getenv("GOOGLE_GENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")).rstrip("/")
+        self.response_mime_type = response_mime_type or os.getenv("IMAGE_GEN_RESPONSE_MIME_TYPE", "text/plain")
+        self.model = model or os.getenv("IMAGE_GEN_MODEL")
+        
+        if not self.model:
+            if self.provider == "google":
+                # Official Gemini API image-capable default
+                self.model = "models/gemini-1.5-flash"
+            else:
+                self.model = "google/gemini-3-pro-image-preview"
+        
+        if self.provider == "openrouter":
+            self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        elif self.provider == "google":
+            self.client = None
+        else:
+            raise ValueError(f"Unsupported image generation provider: {self.provider}")
     
     def generate(
         self,
@@ -382,6 +402,12 @@ class ImageGenerator:
         return [img for img in figure_images if img.get("figure_id") in used_ids]
     
     def _call_model(self, prompt: str, reference_images: List[dict]) -> tuple:
+        """Call image generation provider based on configuration."""
+        if self.provider == "google":
+            return self._call_model_google(prompt, reference_images)
+        return self._call_model_openrouter(prompt, reference_images)
+    
+    def _call_model_openrouter(self, prompt: str, reference_images: List[dict]) -> tuple:
         """Call the image generation model with retry logic."""
         logger = logging.getLogger(__name__)
         content = [{"type": "text", "text": prompt}]
@@ -447,6 +473,110 @@ class ImageGenerator:
                 
             except Exception as e:
                 logger.error(f"Error in API call (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                raise
+        
+        raise RuntimeError("Image generation failed after all retry attempts")
+    
+    def _call_model_google(self, prompt: str, reference_images: List[dict]) -> tuple:
+        """Call the official Google Gemini API for image generation."""
+        logger = logging.getLogger(__name__)
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        model_name = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        url = f"{self.google_api_base_url}/{model_name}:generateContent"
+        
+        wants_image = self.response_mime_type.lower().startswith("image/")
+        model_key = model_name.split("/", 1)[-1]
+        image_capable_prefixes = (
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash",
+        )
+        if wants_image and not model_key.startswith(image_capable_prefixes):
+            raise ValueError(
+                f"Model '{model_name}' does not support image responses with the Google Gemini API. "
+                "Use an image-capable model such as 'models/gemini-1.5-flash' (or -8b/pro/2.0-flash) "
+                "or change IMAGE_GEN_RESPONSE_MIME_TYPE to a text type."
+            )
+        
+        # Compose prompt parts with optional inline reference images
+        parts = [{"text": prompt}]
+        for img in reference_images:
+            if img.get("base64") and img.get("mime_type"):
+                fig_id = img.get("figure_id", "Figure")
+                caption = img.get("caption", "")
+                label = f"[{fig_id}]: {caption}" if caption else f"[{fig_id}]"
+                parts.append({"text": label})
+                parts.append({
+                    "inlineData": {
+                        "mimeType": img["mime_type"],
+                        "data": img["base64"],
+                    }
+                })
+        
+        payload = {
+            "contents": [{"role": "user", "parts": parts}],
+            "generationConfig": {"responseMimeType": self.response_mime_type},
+        }
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Calling Google Gemini image API (attempt {attempt + 1}/{max_retries})...")
+                response = requests.post(
+                    url,
+                    params={"key": self.api_key},
+                    json=payload,
+                    timeout=60,
+                )
+                
+                if response.status_code >= 400:
+                    logger.warning(f"Google API error {response.status_code}: {response.text[:200]}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay * (attempt + 1))
+                        continue
+                    response.raise_for_status()
+                
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    error_msg = "Google API response has no candidates"
+                    logger.warning(f"{error_msg} (attempt {attempt + 1}/{max_retries})")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay * (attempt + 1))
+                        continue
+                    raise RuntimeError(error_msg)
+                
+                parts = candidates[0].get("content", {}).get("parts", [])
+                for part in parts:
+                    inline = part.get("inlineData")
+                    if inline and inline.get("data"):
+                        mime_type = inline.get("mimeType") or self.response_mime_type
+                        logger.info("Image generation successful (Google Gemini)")
+                        return base64.b64decode(inline["data"]), mime_type
+                    
+                    text_data = part.get("text")
+                    if text_data:
+                        try:
+                            decoded = base64.b64decode(text_data, validate=True)
+                            logger.info("Image generation successful (Google Gemini, text base64 payload)")
+                            return decoded, self.response_mime_type
+                        except Exception:
+                            continue
+                
+                error_msg = "Image generation failed - no image payload in response"
+                logger.warning(f"{error_msg} (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                raise RuntimeError(error_msg)
+            
+            except Exception as e:
+                logger.error(f"Error in Google API call (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay * (attempt + 1))
                     continue
