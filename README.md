@@ -376,6 +376,12 @@ Paper2Slides/
 
 ---
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=HKUDS/Paper2Slides&type=timeline&legend=top-left)](https://www.star-history.com/#HKUDS/Paper2Slides&type=timeline&legend=top-left)
+
+---
+
 <p align="center">
   <em> ❤️ Thanks for visiting ✨ Paper2Slides!</em><br><br>
   <img src="https://visitor-badge.laobi.icu/badge?page_id=HKUDS.Paper2Slides&style=for-the-badge&color=00d4ff" alt="Views">
