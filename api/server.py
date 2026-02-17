@@ -192,7 +192,7 @@ h2{color:#16a34a;margin-bottom:.5rem}p{color:#555}
 
 @app.get("/auth/oauth/start")
 async def oauth_start():
-    auth_url, _ = oauth_manager.start_flow(SERVER_PORT)
+    auth_url = oauth_manager.start_flow(SERVER_PORT)
     separator = "=" * 60
     print(f"\n{separator}")
     print("OpenAI OAuth — open this URL in your browser:\n")
