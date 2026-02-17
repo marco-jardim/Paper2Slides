@@ -3,6 +3,7 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import ConversationList from './ConversationList'
 import ConfigPanel from './ConfigPanel'
+import OAuthButton from './OAuthButton'
 import { PanelLeftOpen, FileText, Download, Eye, X } from 'lucide-react'
 
 // Generate unique ID
@@ -1028,15 +1029,18 @@ const ChatWindow = () => {
             </div>
           </div>
 
-          {/* Current conversation files indicator */}
-          {conversationFiles.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-purple-700 dark:text-purple-300">
-                {conversationFiles.length} file{conversationFiles.length > 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
+          {/* Right side: files indicator + OAuth login */}
+          <div className="flex items-center gap-3">
+            {conversationFiles.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm text-purple-700 dark:text-purple-300">
+                  {conversationFiles.length} file{conversationFiles.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+            <OAuthButton />
+          </div>
         </div>
 
         {/* Messages Area */}

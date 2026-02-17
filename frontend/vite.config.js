@@ -28,7 +28,17 @@ export default defineConfig({
         rewrite: (path) => path
       },
       '/uploads': {
-        target: 'http://localhost:8001',  // Backend default port
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
+      '/auth': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
+      '/openai-proxy': {
+        target: 'http://localhost:8001',
         changeOrigin: true,
         rewrite: (path) => path
       }
