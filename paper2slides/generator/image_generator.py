@@ -132,6 +132,7 @@ class ImageGenerator:
         figure_images = self._load_figure_images(plan, gen_input.origin.base_path)
         style_name = gen_input.config.style.value
         custom_style = gen_input.config.custom_style
+        language_name = gen_input.config.get_language_name()
         
         # Process custom style with LLM if needed
         processed_style = None
@@ -144,26 +145,27 @@ class ImageGenerator:
         all_images = self._filter_images(plan.sections, figure_images)
         
         if plan.output_type == "poster":
-            result = self._generate_poster(style_name, processed_style, all_sections_md, all_images)
+            result = self._generate_poster(style_name, processed_style, all_sections_md, all_images, language_name=language_name)
             if save_callback and result:
                 save_callback(result[0], 0, 1)
             return result
         else:
-            return self._generate_slides(plan, style_name, processed_style, all_sections_md, figure_images, max_workers, save_callback)
+            return self._generate_slides(plan, style_name, processed_style, all_sections_md, figure_images, max_workers, save_callback, language_name=language_name)
     
-    def _generate_poster(self, style_name, processed_style: Optional[ProcessedStyle], sections_md, images) -> List[GeneratedImage]:
+    def _generate_poster(self, style_name, processed_style: Optional[ProcessedStyle], sections_md, images, language_name: str = "English") -> List[GeneratedImage]:
         """Generate 1 poster image."""
         prompt = self._build_poster_prompt(
             format_prefix=FORMAT_POSTER,
             style_name=style_name,
             processed_style=processed_style,
             sections_md=sections_md,
+            language_name=language_name,
         )
         
         image_data, mime_type = self._call_model(prompt, images)
         return [GeneratedImage(section_id="poster", image_data=image_data, mime_type=mime_type)]
     
-    def _generate_slides(self, plan, style_name, processed_style: Optional[ProcessedStyle], all_sections_md, figure_images, max_workers: int, save_callback=None) -> List[GeneratedImage]:
+    def _generate_slides(self, plan, style_name, processed_style: Optional[ProcessedStyle], all_sections_md, figure_images, max_workers: int, save_callback=None, language_name: str = "English") -> List[GeneratedImage]:
         """Generate N slide images (slides 1-2 sequential, 3+ parallel)."""
         results = []
         total = len(plan.sections)
@@ -191,6 +193,7 @@ class ImageGenerator:
                 layout_rule=layout_rule,
                 slide_info=f"Slide {i+1} of {total}",
                 context_md=all_sections_md,
+                language_name=language_name,
             )
             
             section_images = self._filter_images([section], figure_images)
@@ -232,6 +235,7 @@ class ImageGenerator:
                     layout_rule=layout_rule,
                     slide_info=f"Slide {i+1} of {total}",
                     context_md=all_sections_md,
+                    language_name=language_name,
                 )
                 
                 section_images = self._filter_images([section], figure_images)
@@ -261,13 +265,14 @@ class ImageGenerator:
         
         return results
     
-    def _format_custom_style_for_poster(self, ps: ProcessedStyle) -> str:
+    def _format_custom_style_for_poster(self, ps: ProcessedStyle, language_name: str = "English") -> str:
         """Format ProcessedStyle into style hints string for poster."""
+        lang_instruction = f"{language_name} text only." if language_name != "English" else "English text only."
         parts = [
             ps.style_name + ".",
-            "English text only.",
+            lang_instruction,
             "Use ROUNDED sans-serif fonts for ALL text.",
-            "Characters should react to or interact with the content, with appropriate poses/actions and sizes - not just decoration."
+            "Characters should react to or interact with the content, with appropriate poses/actions and sizes - not just decoration.",
             f"LIMITED COLOR PALETTE (3-4 colors max): {ps.color_tone}.",
             POSTER_COMMON_STYLE_RULES,
         ]
@@ -275,11 +280,12 @@ class ImageGenerator:
             parts.append(ps.special_elements + ".")
         return " ".join(parts)
     
-    def _format_custom_style_for_slide(self, ps: ProcessedStyle) -> str:
+    def _format_custom_style_for_slide(self, ps: ProcessedStyle, language_name: str = "English") -> str:
         """Format ProcessedStyle into style hints string for slide."""
+        lang_instruction = f"{language_name} text only." if language_name != "English" else "English text only."
         parts = [
             ps.style_name + ".",
-            "English text only.",
+            lang_instruction,
             "Use ROUNDED sans-serif fonts for ALL text.",
             "Characters should react to or interact with the content, with appropriate poses/actions and sizes - not just decoration.",
             f"LIMITED COLOR PALETTE (3-4 colors max): {ps.color_tone}.",
@@ -289,16 +295,19 @@ class ImageGenerator:
             parts.append(ps.special_elements + ".")
         return " ".join(parts)
     
-    def _build_poster_prompt(self, format_prefix, style_name, processed_style: Optional[ProcessedStyle], sections_md) -> str:
+    def _build_poster_prompt(self, format_prefix, style_name, processed_style: Optional[ProcessedStyle], sections_md, language_name: str = "English") -> str:
         """Build prompt for poster."""
         parts = [format_prefix]
         
         if style_name == "custom" and processed_style:
-            parts.append(f"Style: {self._format_custom_style_for_poster(processed_style)}")
+            parts.append(f"Style: {self._format_custom_style_for_poster(processed_style, language_name)}")
             if processed_style.decorations:
                 parts.append(f"Decorations: {processed_style.decorations}")
         else:
             parts.append(POSTER_STYLE_HINTS.get(style_name, POSTER_STYLE_HINTS["academic"]))
+        
+        if language_name != "English":
+            parts.append(f"LANGUAGE REQUIREMENT: ALL text must be written in **{language_name}** only. Do not use English or any other language.")
         
         parts.append(VISUALIZATION_HINTS)
         parts.append(POSTER_FIGURE_HINT)
@@ -306,12 +315,12 @@ class ImageGenerator:
         
         return "\n\n".join(parts)
     
-    def _build_slide_prompt(self, style_name, processed_style: Optional[ProcessedStyle], sections_md, layout_rule, slide_info, context_md) -> str:
+    def _build_slide_prompt(self, style_name, processed_style: Optional[ProcessedStyle], sections_md, layout_rule, slide_info, context_md, language_name: str = "English") -> str:
         """Build prompt for slide with layout rules and consistency."""
         parts = [FORMAT_SLIDE]
         
         if style_name == "custom" and processed_style:
-            parts.append(f"Style: {self._format_custom_style_for_slide(processed_style)}")
+            parts.append(f"Style: {self._format_custom_style_for_slide(processed_style, language_name)}")
         else:
             parts.append(SLIDE_STYLE_HINTS.get(style_name, SLIDE_STYLE_HINTS["academic"]))
         
@@ -319,6 +328,9 @@ class ImageGenerator:
         parts.append(layout_rule)
         if style_name == "custom" and processed_style and processed_style.decorations:
             parts.append(f"Decorations: {processed_style.decorations}")
+        
+        if language_name != "English":
+            parts.append(f"LANGUAGE REQUIREMENT: ALL text must be written in **{language_name}** only. Do not use English or any other language.")
         
         parts.append(VISUALIZATION_HINTS)
         parts.append(CONSISTENCY_HINT)
@@ -535,7 +547,7 @@ class ImageGenerator:
                 )
                 
                 if response.status_code >= 400:
-                    logger.warning(f"Google API error {response.status_code}: {response.text[:200]}")
+                    logger.warning(f"Google API error {response.status_code}: {response.text[:200]}",)
                     if attempt < max_retries - 1:
                         time.sleep(retry_delay * (attempt + 1))
                         continue

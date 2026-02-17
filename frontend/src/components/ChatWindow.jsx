@@ -27,6 +27,7 @@ const ChatWindow = () => {
   const [length, setLength] = useState('medium') // 'short', 'medium', 'long' (for slides)
   const [density, setDensity] = useState('medium') // 'sparse', 'medium', 'dense' (for poster)
   const [fastMode, setFastMode] = useState(true) // Fast mode: parse only, no RAG indexing (only for paper content, default enabled)
+  const [language, setLanguage] = useState('en') // Output language code
   
   const [showLeftPanel, setShowLeftPanel] = useState(true)
   const [currentWorkflow, setCurrentWorkflow] = useState(null) // Now includes conversationId
@@ -560,6 +561,7 @@ const ChatWindow = () => {
       formData.append('content', content)
       formData.append('output_type', output)
       formData.append('style', style)
+      formData.append('language', language)
       if (output === 'slides') {
         formData.append('length', length)
       } else {
@@ -822,6 +824,7 @@ const ChatWindow = () => {
       formData.append('output_type', output)
       formData.append('style', style)
       formData.append('session_id', sessionId)  // Pass session_id to reuse files
+      formData.append('language', language)
       if (output === 'slides') {
         formData.append('length', length)
       } else {
@@ -1127,6 +1130,8 @@ const ChatWindow = () => {
               setDensity={setDensity}
               fastMode={fastMode}
               setFastMode={setFastMode}
+              language={language}
+              setLanguage={setLanguage}
               compact={messages.length > 0}
               onRegenerate={handleRegenerate}
               isLoading={isLoading}

@@ -153,6 +153,7 @@ async def chat(
     density: Optional[str] = Form(None),  # 'sparse', 'medium', 'dense' (for poster)
     fast_mode: Optional[str] = Form(None),  # 'true' or 'false' - fast mode for paper content
     session_id: Optional[str] = Form(None),  # Existing session ID to reuse files
+    language: str = Form("en"),
     files: List[UploadFile] = File([])
 ):
     """
@@ -242,7 +243,7 @@ async def chat(
         print(f"Files: {len(saved_files)} file(s)")
         for f in saved_files:
             print(f"  - {f['filename']} ({f['size']} bytes)")
-        print(f"Config: {output_type} | {style} | {content}")
+        print(f"Config: {output_type} | {style} | {content} | lang={language}")
         if length:
             print(f"  Length: {length}")
         if density:
@@ -280,7 +281,8 @@ async def chat(
             length,
             density,
             fast_mode_bool,
-            session_manager  # Pass session manager to check for cancellation
+            session_manager,
+            language,
         )
         
         # Return immediately so frontend can start polling
@@ -301,7 +303,8 @@ async def generate_slides_with_pipeline(
     length: Optional[str] = None,
     density: Optional[str] = None,
     fast_mode: bool = False,
-    session_manager: SessionManager = None
+    session_manager: SessionManager = None,
+    language: str = "en",
 ) -> dict:
     """
     Run the actual Paper2Slides pipeline
@@ -369,6 +372,7 @@ async def generate_slides_with_pipeline(
         "slides_length": length or "medium",
         "poster_density": density or "medium",
         "fast_mode": fast_mode if content == "paper" else False,  # Fast mode only for paper content
+        "language": language,
     }
     
     base_dir = get_base_dir(str(OUTPUT_DIR), project_name, content)
@@ -496,7 +500,8 @@ async def run_pipeline_background(
     length: Optional[str],
     density: Optional[str],
     fast_mode: bool = False,
-    session_manager: SessionManager = None
+    session_manager: SessionManager = None,
+    language: str = "en",
 ):
     """
     Run pipeline in background and store results
@@ -514,7 +519,7 @@ async def run_pipeline_background(
         
         logger.info(f"Starting background pipeline for session {session_id[:8]}")
         result = await generate_slides_with_pipeline(
-            session_id, message, files, content, output_type, style, length, density, fast_mode, session_manager
+            session_id, message, files, content, output_type, style, length, density, fast_mode, session_manager, language
         )
         
         # Check if cancelled after completion
@@ -602,7 +607,7 @@ async def get_status(session_id: str):
                         except Exception as e:
                             logger.warning(f"Error reading state file {state_file_path}: {e}")
                             continue
-                
+                    
                 # If found exact match, stop searching
                 if state_data and state_data.get("session_id") == session_id:
                     break

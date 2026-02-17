@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react'
-import { Check, X, FileText, Image, Send, Zap } from 'lucide-react'
+import { Check, X, FileText, Image, Send, Zap, Globe } from 'lucide-react'
+
+const LANGUAGES = [
+  { code: 'en',    label: 'English' },
+  { code: 'pt-BR', label: 'Português (BR)' },
+  { code: 'es',    label: 'Español' },
+  { code: 'fr',    label: 'Français' },
+  { code: 'de',    label: 'Deutsch' },
+  { code: 'zh',    label: '中文' },
+  { code: 'ja',    label: '日本語' },
+]
 
 const ConfigPanel = ({ 
   content, 
@@ -14,6 +24,8 @@ const ConfigPanel = ({
   setDensity,
   fastMode = false,
   setFastMode,
+  language = 'en',
+  setLanguage,
   compact = false,
   onRegenerate,
   isLoading = false
@@ -399,6 +411,25 @@ const ConfigPanel = ({
                     />
                   </div>
                 )}
+              </div>
+
+              {/* Language */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <Globe className="w-4 h-4" />
+                  Output Language
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage && setLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Conditional Options */}
