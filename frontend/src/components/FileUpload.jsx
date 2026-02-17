@@ -15,12 +15,18 @@ const FileUpload = ({ onFilesSelected, disabled, customButton }) => {
         'application/pdf',
         'text/markdown',
         'text/x-markdown',
+        'application/x-tex',
+        'application/x-latex',
+        'text/x-tex',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-zip',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
         'application/msword', // doc
         'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'application/vnd.ms-powerpoint'
       ]
-      const validExtensions = ['.pdf', '.md', '.markdown', '.doc', '.docx', '.ppt', '.pptx']
+      const validExtensions = ['.pdf', '.md', '.markdown', '.tex', '.zip', '.doc', '.docx', '.ppt', '.pptx']
       const fileExtension = '.' + file.name.split('.').pop().toLowerCase()
       
       return validTypes.includes(file.type) || 
@@ -30,7 +36,7 @@ const FileUpload = ({ onFilesSelected, disabled, customButton }) => {
     if (validFiles.length > 0) {
       onFilesSelected(validFiles)
     } else {
-      alert('Please upload PDF, DOC, DOCX, or Markdown files')
+      alert('Please upload PDF, Markdown, LaTeX, or ZIP files')
     }
 
     if (fileInputRef.current) {
@@ -48,7 +54,7 @@ const FileUpload = ({ onFilesSelected, disabled, customButton }) => {
           onClick={handleFileSelect}
           disabled={disabled}
           className="p-2 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Attach files (PDF, DOC, DOCX, MD)"
+          title="Attach files (PDF, MD, TEX, ZIP)"
         >
           <Paperclip className="w-5 h-5" />
         </button>
@@ -57,7 +63,7 @@ const FileUpload = ({ onFilesSelected, disabled, customButton }) => {
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".pdf,.md,.markdown,.doc,.docx,.ppt,.pptx"
+        accept=".pdf,.md,.markdown,.tex,.zip,.doc,.docx,.ppt,.pptx"
         onChange={handleFileChange}
         className="hidden"
       />

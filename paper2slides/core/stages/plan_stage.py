@@ -52,6 +52,7 @@ async def run_plan_stage(base_dir: Path, config_dir: Path, config: Dict) -> Dict
         slides_length=SlidesLength(config.get("slides_length", "medium")),
         style=StyleType(config.get("style", "academic")),
         custom_style=config.get("custom_style"),
+        language=config.get("language", "en"),
     )
     
     gen_input = GenerationInput(config=gen_config, content=content, origin=origin)

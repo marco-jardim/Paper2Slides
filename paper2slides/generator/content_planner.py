@@ -190,6 +190,10 @@ class ContentPlanner:
             assets_section=assets_section,
         )
         
+        lang_name = gen_input.config.get_language_name()
+        if gen_input.config.language != "en":
+            prompt += f"\n\n5. **LANGUAGE**: Write ALL content exclusively in **{lang_name}**. Do not use English or any other language."
+        
         result = self._call_multimodal_llm(prompt, figure_images)
         return self._parse_sections(result, is_slides=True)
     
@@ -221,6 +225,10 @@ class ContentPlanner:
             summary=self._truncate(summary, 10000),
             assets_section=assets_section,
         )
+        
+        lang_name = gen_input.config.get_language_name()
+        if gen_input.config.language != "en":
+            prompt += f"\n\n5. **LANGUAGE**: Write ALL content exclusively in **{lang_name}**. Do not use English or any other language."
         
         result = self._call_multimodal_llm(prompt, figure_images)
         return self._parse_sections(result, is_slides=False)

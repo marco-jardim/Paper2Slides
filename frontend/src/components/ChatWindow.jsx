@@ -3,6 +3,7 @@ import MessageList from './MessageList'
 import MessageInput from './MessageInput'
 import ConversationList from './ConversationList'
 import ConfigPanel from './ConfigPanel'
+import OAuthButton from './OAuthButton'
 import { PanelLeftOpen, FileText, Download, Eye, X } from 'lucide-react'
 
 // Generate unique ID
@@ -27,6 +28,7 @@ const ChatWindow = () => {
   const [length, setLength] = useState('medium') // 'short', 'medium', 'long' (for slides)
   const [density, setDensity] = useState('medium') // 'sparse', 'medium', 'dense' (for poster)
   const [fastMode, setFastMode] = useState(true) // Fast mode: parse only, no RAG indexing (only for paper content, default enabled)
+  const [language, setLanguage] = useState('en') // Output language code
   
   const [showLeftPanel, setShowLeftPanel] = useState(true)
   const [currentWorkflow, setCurrentWorkflow] = useState(null) // Now includes conversationId
@@ -126,10 +128,47 @@ const ChatWindow = () => {
     const ext = file.name?.split('.').pop()?.toLowerCase()
     if (ext === 'pdf') return 'PDF Document'
     if (ext === 'md' || ext === 'markdown') return 'Markdown'
+    if (ext === 'tex') return 'LaTeX Document'
+    if (ext === 'zip') return 'ZIP Archive'
     if (ext === 'doc') return 'Word Document'
     if (ext === 'docx') return 'Word Document'
     if (ext === 'ppt' || ext === 'pptx') return 'PowerPoint'
     return file.type || 'Document'
+  }
+
+  const getFileIconEl = (file, size = 'md') => {
+    const ext = (file.name || '').split('.').pop()?.toLowerCase()
+    const sizeClass = size === 'sm'
+      ? 'w-8 h-8 rounded-lg'
+      : 'w-10 h-10 rounded-xl'
+    const iconSize = size === 'sm' ? 'text-[10px]' : 'text-xs'
+    const fileTextSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
+    if (ext === 'md' || ext === 'markdown') {
+      return (
+        <div className={`${sizeClass} bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>MD</span>
+        </div>
+      )
+    }
+    if (ext === 'tex') {
+      return (
+        <div className={`${sizeClass} bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>TEX</span>
+        </div>
+      )
+    }
+    if (ext === 'zip') {
+      return (
+        <div className={`${sizeClass} bg-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>ZIP</span>
+        </div>
+      )
+    }
+    return (
+      <div className={`${sizeClass} bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+        <FileText className={`${fileTextSize} text-white`} />
+      </div>
+    )
   }
 
   // Generate display name for generated output
@@ -375,6 +414,7 @@ const ChatWindow = () => {
           content: resultData.message || '',  // Empty string to not show success message
           slides: resultData.slides || [],
           pptUrl: resultData.ppt_url || null,
+          pptxUrl: resultData.pptx_url || null,
           posterUrl: resultData.poster_url || null,
           config: { content, style, output, length, density, fastMode },
           timestamp: new Date().toISOString()
@@ -392,11 +432,12 @@ const ChatWindow = () => {
           length: output === 'slides' ? length : undefined,
           density: output === 'poster' ? density : undefined,
           pptUrl: resultData.ppt_url || null,
-          posterUrl: resultData.poster_url || null,
-          slides: resultData.slides || [],
-          sourceFiles: (conv?.files || []).map(f => f.name),
-          timestamp: new Date().toISOString()
-        }
+          pptxUrl: resultData.pptx_url || null,
+           posterUrl: resultData.poster_url || null,
+           slides: resultData.slides || [],
+           sourceFiles: (conv?.files || []).map(f => f.name),
+           timestamp: new Date().toISOString()
+         }
         
         setConversations(prev => prev.map(conv => {
           if (conv.id === convId) {
@@ -560,6 +601,7 @@ const ChatWindow = () => {
       formData.append('content', content)
       formData.append('output_type', output)
       formData.append('style', style)
+      formData.append('language', language)
       if (output === 'slides') {
         formData.append('length', length)
       } else {
@@ -822,6 +864,7 @@ const ChatWindow = () => {
       formData.append('output_type', output)
       formData.append('style', style)
       formData.append('session_id', sessionId)  // Pass session_id to reuse files
+      formData.append('language', language)
       if (output === 'slides') {
         formData.append('length', length)
       } else {
@@ -1025,15 +1068,18 @@ const ChatWindow = () => {
             </div>
           </div>
 
-          {/* Current conversation files indicator */}
-          {conversationFiles.length > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <span className="text-sm text-purple-700 dark:text-purple-300">
-                {conversationFiles.length} file{conversationFiles.length > 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
+          {/* Right side: files indicator + OAuth login */}
+          <div className="flex items-center gap-3">
+            {conversationFiles.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <FileText className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm text-purple-700 dark:text-purple-300">
+                  {conversationFiles.length} file{conversationFiles.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+            <OAuthButton />
+          </div>
         </div>
 
         {/* Messages Area */}
@@ -1048,7 +1094,7 @@ const ChatWindow = () => {
                   Welcome to Paper2Slides
                 </h2>
                 <p className="text-base text-gray-600 dark:text-gray-400 max-w-xl mb-6">
-                  Upload your documents <span className="whitespace-nowrap">(PDF, DOC, DOCX, Markdown)</span> and I'll transform them into stunning presentations
+                  Upload your documents <span className="whitespace-nowrap">(PDF, Markdown, LaTeX, ZIP)</span> and I'll transform them into stunning presentations
                 </p>
                 <button
                   onClick={handleNewConversation}
@@ -1066,7 +1112,7 @@ const ChatWindow = () => {
                   Ready to create your presentation
                 </h2>
                 <p className="text-base text-gray-600 dark:text-gray-400 max-w-xl">
-                  Upload your documents <span className="whitespace-nowrap">(PDF, DOC, DOCX, Markdown)</span> to get started
+                  Upload your documents <span className="whitespace-nowrap">(PDF, Markdown, LaTeX, ZIP)</span> to get started
                 </p>
                 {conversationFiles.length > 0 && (
                   <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
@@ -1079,9 +1125,7 @@ const ChatWindow = () => {
                           key={idx}
                           className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700 rounded-lg text-xs relative group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <FileText className="w-4 h-4 text-white" />
-                          </div>
+                          {getFileIconEl(file, 'sm')}
                           <span className="text-gray-700 dark:text-gray-300 pr-6">{file.name}</span>
                           <button
                             type="button"
@@ -1127,6 +1171,8 @@ const ChatWindow = () => {
               setDensity={setDensity}
               fastMode={fastMode}
               setFastMode={setFastMode}
+              language={language}
+              setLanguage={setLanguage}
               compact={messages.length > 0}
               onRegenerate={handleRegenerate}
               isLoading={isLoading}

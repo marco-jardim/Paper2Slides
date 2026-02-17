@@ -280,65 +280,52 @@ async def run_rag_stage(base_dir: Path, config: Dict) -> Dict:
     # ========== FAST MODE: Parse only, no indexing ==========
     if fast_mode:
         logger.info("Running in FAST mode (parse only, no indexing)")
-        
-        from paper2slides.raganything.batch_parser import BatchParser
-        from paper2slides.rag import RAG_PAPER_QUERIES
-        
-        # Parse documents to generate markdown
-        batch_parser = BatchParser(
-            parser_type="mineru",
-            max_workers=4,
-            show_progress=True,
-            skip_installation_check=True,
-        )
-        
-        if path.is_file():
-            logger.info(f"Parsing file: {path.name}")
+
+        # ---- Markdown shortcut: skip MinerU entirely ----
+        _is_md_input = path.suffix.lower() == ".md"
+        _md_in_dir = list(path.glob("*.md")) if path.is_dir() else []
+
+        if _is_md_input:
+            logger.info("Input is already Markdown — skipping MinerU parsing")
+            markdown_paths = [str(path)]
+        elif _md_in_dir:
+            logger.info(f"Directory has {len(_md_in_dir)} Markdown file(s) — skipping MinerU")
+            markdown_paths = [str(f) for f in sorted(_md_in_dir)]
         else:
-            logger.info(f"Parsing directory: {path.name}")
-        
-        parse_result = batch_parser.process_batch(
-            file_paths=[input_path],
-            output_dir=str(output_dir),
-            parse_method="auto",
-            recursive=True,
-        )
-        
-        logger.info(f"  Parsing completed: {len(parse_result.successful_files)} successful")
-        
-        # Collect markdown files
-        md_files = list(output_dir.rglob("*.md"))
-        markdown_paths = [str(f) for f in md_files]
-        
-        if not markdown_paths:
-            raise ValueError("No markdown files generated")
-        
-        logger.info(f"  Found {len(markdown_paths)} markdown file(s)")
-        
-        # Use OpenAI to query markdown content directly
-        logger.info("")
-        logger.info(f"Running queries with GPT-4o and images ({content_type})...")
-        
-        from openai import OpenAI
-        
-        api_key = os.getenv("RAG_LLM_API_KEY", "")
-        base_url = os.getenv("RAG_LLM_BASE_URL")
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        
-        # Execute queries (direct GPT-4o with images in original positions)
-        if content_type == "paper":
-            rag_results = await _run_fast_queries_by_category(
-                client=client,
-                markdown_content="",  # Not used anymore, content is processed inside
-                markdown_paths=markdown_paths,
-                queries_by_category=RAG_PAPER_QUERIES,
+            from paper2slides.raganything.batch_parser import BatchParser
+
+            # Parse documents to generate markdown
+            batch_parser = BatchParser(
+                parser_type="mineru",
+                max_workers=4,
+                show_progress=True,
+                skip_installation_check=True,
             )
-        else:
-            raise ValueError("Fast mode currently only supports content_type='paper'")
-        
-        total = sum(len(r) for r in rag_results.values())
-        logger.info(f"  Completed {total} queries")
-    
+
+            if path.is_file():
+                logger.info(f"Parsing file: {path.name}")
+            else:
+                logger.info(f"Parsing directory: {path.name}")
+
+            parse_result = batch_parser.process_batch(
+                file_paths=[input_path],
+                output_dir=str(output_dir),
+                parse_method="auto",
+                recursive=True,
+            )
+
+            logger.info(f"  Parsing completed: {len(parse_result.successful_files)} successful")
+
+            md_files = list(output_dir.rglob("*.md"))
+            markdown_paths = [str(f) for f in md_files]
+
+            if not markdown_paths:
+                raise ValueError("No markdown files generated")
+
+        logger.info(f"  Found {len(markdown_paths)} markdown file(s)")
+
+        from paper2slides.rag import RAG_PAPER_QUERIES
+
     # ========== NORMAL MODE: Full RAG pipeline ==========
     else:
         from paper2slides.rag import RAGClient, RAG_PAPER_QUERIES, RAG_QUERY_MODES

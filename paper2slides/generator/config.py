@@ -42,6 +42,17 @@ SLIDES_PAGE_RANGES: Dict[str, tuple[int, int]] = {
     "long": (12, 15),
 }
 
+# Supported languages: code -> full name for prompts
+SUPPORTED_LANGUAGES: Dict[str, str] = {
+    "en":    "English",
+    "pt-BR": "Brazilian Portuguese",
+    "es":    "Spanish",
+    "fr":    "French",
+    "de":    "German",
+    "zh":    "Chinese (Simplified)",
+    "ja":    "Japanese",
+}
+
 
 @dataclass
 class GenerationConfig:
@@ -54,6 +65,7 @@ class GenerationConfig:
         slides_length: Page count level for slides (short/medium/long)
         style: Style type (academic/doraemon/custom)
         custom_style: User's custom style description (used when style=custom)
+        language: Output language code (e.g. 'en', 'pt-BR', 'es')
     """
     output_type: OutputType = OutputType.POSTER
     
@@ -66,6 +78,13 @@ class GenerationConfig:
     # Style
     style: StyleType = StyleType.ACADEMIC
     custom_style: Optional[str] = None
+
+    # Language
+    language: str = "en"
+
+    def get_language_name(self) -> str:
+        """Get the full language name for use in prompts."""
+        return SUPPORTED_LANGUAGES.get(self.language, "English")
     
     def get_page_range(self) -> tuple[int, int]:
         """Get page count range for slides."""
@@ -78,6 +97,7 @@ class GenerationConfig:
             "slides_length": self.slides_length.value,
             "style": self.style.value,
             "custom_style": self.custom_style,
+            "language": self.language,
         }
 
 
