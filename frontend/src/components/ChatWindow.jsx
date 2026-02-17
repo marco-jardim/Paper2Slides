@@ -128,10 +128,47 @@ const ChatWindow = () => {
     const ext = file.name?.split('.').pop()?.toLowerCase()
     if (ext === 'pdf') return 'PDF Document'
     if (ext === 'md' || ext === 'markdown') return 'Markdown'
+    if (ext === 'tex') return 'LaTeX Document'
+    if (ext === 'zip') return 'ZIP Archive'
     if (ext === 'doc') return 'Word Document'
     if (ext === 'docx') return 'Word Document'
     if (ext === 'ppt' || ext === 'pptx') return 'PowerPoint'
     return file.type || 'Document'
+  }
+
+  const getFileIconEl = (file, size = 'md') => {
+    const ext = (file.name || '').split('.').pop()?.toLowerCase()
+    const sizeClass = size === 'sm'
+      ? 'w-8 h-8 rounded-lg'
+      : 'w-10 h-10 rounded-xl'
+    const iconSize = size === 'sm' ? 'text-[10px]' : 'text-xs'
+    const fileTextSize = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5'
+    if (ext === 'md' || ext === 'markdown') {
+      return (
+        <div className={`${sizeClass} bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>MD</span>
+        </div>
+      )
+    }
+    if (ext === 'tex') {
+      return (
+        <div className={`${sizeClass} bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>TEX</span>
+        </div>
+      )
+    }
+    if (ext === 'zip') {
+      return (
+        <div className={`${sizeClass} bg-orange-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+          <span className={`text-white ${iconSize} font-bold`}>ZIP</span>
+        </div>
+      )
+    }
+    return (
+      <div className={`${sizeClass} bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm`}>
+        <FileText className={`${fileTextSize} text-white`} />
+      </div>
+    )
   }
 
   // Generate display name for generated output
@@ -1057,7 +1094,7 @@ const ChatWindow = () => {
                   Welcome to Paper2Slides
                 </h2>
                 <p className="text-base text-gray-600 dark:text-gray-400 max-w-xl mb-6">
-                  Upload your documents <span className="whitespace-nowrap">(PDF, DOC, DOCX, Markdown)</span> and I'll transform them into stunning presentations
+                  Upload your documents <span className="whitespace-nowrap">(PDF, Markdown, LaTeX, ZIP)</span> and I'll transform them into stunning presentations
                 </p>
                 <button
                   onClick={handleNewConversation}
@@ -1075,7 +1112,7 @@ const ChatWindow = () => {
                   Ready to create your presentation
                 </h2>
                 <p className="text-base text-gray-600 dark:text-gray-400 max-w-xl">
-                  Upload your documents <span className="whitespace-nowrap">(PDF, DOC, DOCX, Markdown)</span> to get started
+                  Upload your documents <span className="whitespace-nowrap">(PDF, Markdown, LaTeX, ZIP)</span> to get started
                 </p>
                 {conversationFiles.length > 0 && (
                   <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
@@ -1088,9 +1125,7 @@ const ChatWindow = () => {
                           key={idx}
                           className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700 rounded-lg text-xs relative group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <FileText className="w-4 h-4 text-white" />
-                          </div>
+                          {getFileIconEl(file, 'sm')}
                           <span className="text-gray-700 dark:text-gray-300 pr-6">{file.name}</span>
                           <button
                             type="button"

@@ -79,10 +79,38 @@ const MessageInput = ({ onSendMessage, isLoading, outputType, style, preSelected
     const ext = file.name?.split('.').pop()?.toLowerCase()
     if (ext === 'pdf') return 'PDF Document'
     if (ext === 'md' || ext === 'markdown') return 'Markdown'
+    if (ext === 'tex') return 'LaTeX Document'
+    if (ext === 'zip') return 'ZIP Archive'
     if (ext === 'doc') return 'Word Document'
     if (ext === 'docx') return 'Word Document'
     if (ext === 'ppt' || ext === 'pptx') return 'PowerPoint'
     return file.type || 'Document'
+  }
+
+  const getExtBadge = (file) => {
+    const ext = (file.name || '').split('.').pop()?.toLowerCase()
+    if (ext === 'md' || ext === 'markdown') {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 flex-shrink-0">
+          MD
+        </span>
+      )
+    }
+    if (ext === 'tex') {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 flex-shrink-0">
+          TEX
+        </span>
+      )
+    }
+    if (ext === 'zip') {
+      return (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 flex-shrink-0">
+          ZIP
+        </span>
+      )
+    }
+    return <FileText className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
   }
 
   const canSend = selectedFiles.length > 0
@@ -153,7 +181,7 @@ const MessageInput = ({ onSendMessage, isLoading, outputType, style, preSelected
                         {selectedFiles.length > 0 ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected` : 'Drop files here or click to upload'}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        PDF, DOC, DOCX, Markdown
+                        PDF, Markdown, LaTeX, ZIP
                       </p>
                     </div>
                   </button>
@@ -193,7 +221,7 @@ const MessageInput = ({ onSendMessage, isLoading, outputType, style, preSelected
                     key={index}
                     className="group flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg text-xs"
                   >
-                    <FileText className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                    {getExtBadge(file)}
                     <span className="text-gray-900 dark:text-gray-100 truncate max-w-[150px]" title={file.name}>
                       {file.name}
                     </span>

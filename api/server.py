@@ -25,6 +25,7 @@ from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from oauth import oauth_manager
+from ingestor import ingest_document
 
 SERVER_PORT = 8001  # updated in __main__
 
@@ -345,8 +346,15 @@ async def chat(
             print(f"Loaded {len(saved_files)} existing file(s) from session")
         else:
             # Save newly uploaded files
+            _ACCEPTED_EXTENSIONS = {".pdf", ".md", ".markdown", ".tex", ".zip"}
             for file in files:
                 if file.filename:
+                    ext = Path(file.filename).suffix.lower()
+                    if ext not in _ACCEPTED_EXTENSIONS:
+                        logger.warning(
+                            f"Skipping unsupported file type: {file.filename}"
+                        )
+                        continue
                     file_path = session_dir / file.filename
                     CHUNK_SIZE = 1024 * 1024  # 1MB chunks
                     with open(file_path, "wb") as buffer:
@@ -452,76 +460,112 @@ async def generate_slides_with_pipeline(
     Returns:
         Dictionary with slides info and output paths
     """
-    # Find PDF files (support multiple PDFs in one session)
-    pdf_files = [f for f in files if f["filename"].lower().endswith(".pdf")]
-    if not pdf_files:
-        raise ValueError("No PDF file found in uploaded files")
+    # ------------------------------------------------------------------
+    # Route: non-PDF inputs use the direct ingestor; PDFs use RAG/MinerU
+    # ------------------------------------------------------------------
+    _NON_PDF_EXTS = {".md", ".markdown", ".tex", ".zip"}
+    non_pdf_files = [
+        f for f in files if Path(f["path"]).suffix.lower() in _NON_PDF_EXTS
+    ]
+    pdf_only_files = [f for f in files if Path(f["path"]).suffix.lower() == ".pdf"]
 
-    # Parse style and message
-    # Priority: message > style parameter
+    # Parse style / message (common to both paths)
     PREDEFINED_STYLES = {"academic", "doraemon"}
-
     if message and message.strip():
-        # If user provided message, use it as custom style description
         style_type = "custom"
         custom_style = message.strip()
     elif style.lower() in PREDEFINED_STYLES:
-        # Use predefined style
         style_type = style.lower()
         custom_style = None
     else:
-        # Use style parameter as custom description
         style_type = "custom"
         custom_style = style
 
-    # Handle multiple PDFs: all paths in a list
-    pdf_paths = [f["path"] for f in pdf_files]
+    if non_pdf_files and not pdf_only_files:
+        # ── Direct ingestor path (.md / .tex / .zip) ──────────────────
+        primary = non_pdf_files[0]
+        file_path = primary["path"]
+        project_name = get_project_name(file_path)
+        input_path = file_path
+        pdf_paths: List[str] = []
 
-    # Determine paths (using session-based directory for multiple PDFs)
-    if len(pdf_paths) > 1:
-        # Multiple PDFs: use session_id as the identifier
-        project_name = f"session_{session_id[:8]}"
-        # Use session directory as input_path for multiple files
-        input_path = str(Path(pdf_paths[0]).parent)
-        print(f"Processing {len(pdf_paths)} PDFs as a single project")
+        # Ingestor always writes to the "fast" mode directory
+        config = {
+            "input_path": input_path,
+            "pdf_paths": pdf_paths,
+            "content_type": content,
+            "output_type": output_type,
+            "style": style_type,
+            "custom_style": custom_style,
+            "slides_length": length or "medium",
+            "poster_density": density or "medium",
+            "fast_mode": True,  # ingestor writes to fast/ dir
+            "language": language,
+        }
+
+        base_dir = get_base_dir(str(OUTPUT_DIR), project_name, content)
+        config_dir = get_config_dir(base_dir, config)
+
+        print(f"\nPipeline Configuration (direct ingest):")
+        print(f"  Project: {project_name}")
+        print(f"  Input:   {Path(file_path).name}")
+        if message and message.strip():
+            print(f"  Message: {message}")
+        print(f"  Output:  {base_dir}")
+        print(f"  Config:  {config_dir.name}")
+
+        # Parse document → write checkpoint_rag.json
+        logger.info(f"Ingesting document directly: {primary['filename']}")
+        ingest_document(file_path, config, str(base_dir))
+
+        # RAG stage is replaced by the ingestor; start from summary
+        from_stage = "summary"
+        print(f"Starting from stage: {from_stage}")
+
     else:
-        # Single PDF: use pdf name
-        project_name = get_project_name(pdf_paths[0])
-        # Use the single PDF path as input_path
-        input_path = pdf_paths[0]
+        # ── Standard PDF / RAG path ────────────────────────────────────
+        pdf_files = pdf_only_files
+        if not pdf_files:
+            raise ValueError("No supported file found in uploaded files")
 
-    # Build config matching main.py format
-    config = {
-        "input_path": input_path,  # Required by RAG stage
-        "pdf_paths": pdf_paths,  # Support multiple PDFs
-        "content_type": content,
-        "output_type": output_type,
-        "style": style_type,
-        "custom_style": custom_style,
-        "slides_length": length or "medium",
-        "poster_density": density or "medium",
-        "fast_mode": fast_mode
-        if content == "paper"
-        else False,  # Fast mode only for paper content
-        "language": language,
-    }
+        pdf_paths = [f["path"] for f in pdf_files]
 
-    base_dir = get_base_dir(str(OUTPUT_DIR), project_name, content)
-    config_dir = get_config_dir(base_dir, config)
+        if len(pdf_paths) > 1:
+            project_name = f"session_{session_id[:8]}"
+            input_path = str(Path(pdf_paths[0]).parent)
+            print(f"Processing {len(pdf_paths)} PDFs as a single project")
+        else:
+            project_name = get_project_name(pdf_paths[0])
+            input_path = pdf_paths[0]
 
-    print(f"\nPipeline Configuration:")
-    print(f"  Project: {project_name}")
-    print(f"  PDFs: {len(pdf_paths)}")
-    for i, path in enumerate(pdf_paths, 1):
-        print(f"    [{i}] {Path(path).name}")
-    if message and message.strip():
-        print(f"  Message: {message}")
-    print(f"  Output: {base_dir}")
-    print(f"  Config: {config_dir.name}")
+        config = {
+            "input_path": input_path,
+            "pdf_paths": pdf_paths,
+            "content_type": content,
+            "output_type": output_type,
+            "style": style_type,
+            "custom_style": custom_style,
+            "slides_length": length or "medium",
+            "poster_density": density or "medium",
+            "fast_mode": fast_mode if content == "paper" else False,
+            "language": language,
+        }
 
-    # Detect start stage first
-    from_stage = detect_start_stage(base_dir, config_dir, config)
-    print(f"Starting from stage: {from_stage}")
+        base_dir = get_base_dir(str(OUTPUT_DIR), project_name, content)
+        config_dir = get_config_dir(base_dir, config)
+
+        print(f"\nPipeline Configuration:")
+        print(f"  Project: {project_name}")
+        print(f"  PDFs: {len(pdf_paths)}")
+        for i, path in enumerate(pdf_paths, 1):
+            print(f"    [{i}] {Path(path).name}")
+        if message and message.strip():
+            print(f"  Message: {message}")
+        print(f"  Output: {base_dir}")
+        print(f"  Config: {config_dir.name}")
+
+        from_stage = detect_start_stage(base_dir, config_dir, config)
+        print(f"Starting from stage: {from_stage}")
 
     # Create initial state BEFORE starting pipeline
     from paper2slides.core.state import create_state, save_state, STAGES
@@ -611,12 +655,18 @@ def _update_state_on_error(
     from paper2slides.core.state import load_state, save_state
     import json
 
-    # Find PDF files
+    # Find input files – prefer already-converted PDFs, fall back to any
+    # supported source type (original .tex / .md / .zip before preprocessing)
+    _SUPPORTED = {".pdf", ".md", ".markdown", ".tex", ".zip"}
     pdf_files = [f for f in files if f["filename"].lower().endswith(".pdf")]
-    if not pdf_files:
+    all_input_files = [
+        f for f in files if Path(f["filename"]).suffix.lower() in _SUPPORTED
+    ]
+    primary_files = pdf_files if pdf_files else all_input_files
+    if not primary_files:
         return
 
-    pdf_paths = [f["path"] for f in pdf_files]
+    pdf_paths = [f["path"] for f in primary_files]
     if len(pdf_paths) > 1:
         project_name = f"session_{session_id[:8]}"
     else:
@@ -752,16 +802,24 @@ async def get_status(session_id: str):
                 status_code=404, detail=f"Session {session_id} not found"
             )
 
-        # Get PDF files from session
-        pdf_files = list(session_dir.glob("*.pdf"))
-        if not pdf_files:
+        # Collect all supported input files from the session directory
+        # (PDFs may be generated by preprocessing; also look for source types)
+        _GLOB_PATTERNS = ("*.pdf", "*.md", "*.markdown", "*.tex", "*.zip")
+        session_files = []
+        for pattern in _GLOB_PATTERNS:
+            session_files.extend(session_dir.glob(pattern))
+        if not session_files:
             return {"session_id": session_id, "status": "no_files", "stages": {}}
 
+        # Prefer PDFs for project-name derivation (they may already be compiled)
+        pdf_files = [f for f in session_files if f.suffix.lower() == ".pdf"]
+        name_files = pdf_files if pdf_files else session_files
+
         # Determine project name and paths
-        if len(pdf_files) > 1:
+        if len(name_files) > 1:
             project_name = f"session_{session_id[:8]}"
         else:
-            project_name = get_project_name(str(pdf_files[0]))
+            project_name = get_project_name(str(name_files[0]))
 
         # Try to find the state file matching session_id
         from paper2slides.core.paths import get_base_dir
@@ -880,11 +938,21 @@ async def get_result(session_id: str):
 
             # Get output_type from state
             session_dir = UPLOAD_DIR / session_id
-            pdf_files = list(session_dir.glob("*.pdf"))
-            if len(pdf_files) > 1:
+            # Support sessions that started with non-PDF source files
+            _RESULT_PATTERNS = ("*.pdf", "*.md", "*.markdown", "*.tex", "*.zip")
+            result_session_files = []
+            for _pat in _RESULT_PATTERNS:
+                result_session_files.extend(session_dir.glob(_pat))
+            _pdf_ses = [f for f in result_session_files if f.suffix.lower() == ".pdf"]
+            _name_ses = _pdf_ses if _pdf_ses else result_session_files
+            if len(_name_ses) > 1:
                 project_name = f"session_{session_id[:8]}"
             else:
-                project_name = get_project_name(str(pdf_files[0]))
+                project_name = (
+                    get_project_name(str(_name_ses[0]))
+                    if _name_ses
+                    else f"session_{session_id[:8]}"
+                )
 
             # Try to get output type from state
             from paper2slides.core.paths import get_base_dir

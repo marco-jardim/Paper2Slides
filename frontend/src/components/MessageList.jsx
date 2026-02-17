@@ -33,10 +33,42 @@ const MessageList = ({ messages, uploadedFiles, currentWorkflow, isLoading, onCa
     const ext = file.name?.split('.').pop()?.toLowerCase()
     if (ext === 'pdf') return 'PDF Document'
     if (ext === 'md' || ext === 'markdown') return 'Markdown'
+    if (ext === 'tex') return 'LaTeX Document'
+    if (ext === 'zip') return 'ZIP Archive'
     if (ext === 'doc') return 'Word Document'
     if (ext === 'docx') return 'Word Document'
     if (ext === 'ppt' || ext === 'pptx') return 'PowerPoint'
     return file.type || 'Document'
+  }
+
+  const getFileIconEl = (file) => {
+    const ext = (file.name || '').split('.').pop()?.toLowerCase()
+    if (ext === 'md' || ext === 'markdown') {
+      return (
+        <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md">
+          <span className="text-white text-xs font-bold">MD</span>
+        </div>
+      )
+    }
+    if (ext === 'tex') {
+      return (
+        <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-md">
+          <span className="text-white text-xs font-bold">TEX</span>
+        </div>
+      )
+    }
+    if (ext === 'zip') {
+      return (
+        <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0 shadow-md">
+          <span className="text-white text-xs font-bold">ZIP</span>
+        </div>
+      )
+    }
+    return (
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+        <FileText className="w-5 h-5 text-white" />
+      </div>
+    )
   }
   
   const getStageIcon = (status) => {
@@ -204,9 +236,7 @@ const MessageList = ({ messages, uploadedFiles, currentWorkflow, isLoading, onCa
                               key={fileIndex}
                               className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-200 dark:border-purple-700 rounded-xl shadow-sm relative group"
                             >
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                                <FileText className="w-5 h-5 text-white" />
-                              </div>
+                              {getFileIconEl(fileWithUrl)}
                               <div className="flex-1 min-w-0 pr-8">
                                 <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                                   {fileWithUrl.name}
