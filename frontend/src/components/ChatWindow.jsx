@@ -377,6 +377,7 @@ const ChatWindow = () => {
           content: resultData.message || '',  // Empty string to not show success message
           slides: resultData.slides || [],
           pptUrl: resultData.ppt_url || null,
+          pptxUrl: resultData.pptx_url || null,
           posterUrl: resultData.poster_url || null,
           config: { content, style, output, length, density, fastMode },
           timestamp: new Date().toISOString()
@@ -394,11 +395,12 @@ const ChatWindow = () => {
           length: output === 'slides' ? length : undefined,
           density: output === 'poster' ? density : undefined,
           pptUrl: resultData.ppt_url || null,
-          posterUrl: resultData.poster_url || null,
-          slides: resultData.slides || [],
-          sourceFiles: (conv?.files || []).map(f => f.name),
-          timestamp: new Date().toISOString()
-        }
+          pptxUrl: resultData.pptx_url || null,
+           posterUrl: resultData.poster_url || null,
+           slides: resultData.slides || [],
+           sourceFiles: (conv?.files || []).map(f => f.name),
+           timestamp: new Date().toISOString()
+         }
         
         setConversations(prev => prev.map(conv => {
           if (conv.id === convId) {

@@ -313,6 +313,16 @@ const MessageList = ({ messages, uploadedFiles, currentWorkflow, isLoading, onCa
                               <span>Download PDF</span>
                             </a>
                           )}
+                          {round.assistantMessage.pptxUrl && (
+                            <a
+                              href={round.assistantMessage.pptxUrl}
+                              download
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl transition-all text-sm font-medium shadow-lg hover:shadow-xl"
+                            >
+                              <Download className="w-4 h-4" />
+                              <span>Download PPTX</span>
+                            </a>
+                          )}
                           {round.assistantMessage.posterUrl && (
                             <a
                               href={round.assistantMessage.posterUrl}

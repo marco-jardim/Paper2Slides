@@ -126,6 +126,7 @@ class ChatResponse(BaseModel):
     message: str
     slides: Optional[List[dict]] = None
     ppt_url: Optional[str] = None
+    pptx_url: Optional[str] = None
     poster_url: Optional[str] = None
     session_id: Optional[str] = None
     uploaded_files: Optional[List[dict]] = None
@@ -921,6 +922,12 @@ async def get_result(session_id: str):
             }
 
             # Add download links
+            pptx_file = next(
+                (f for f in output_files if f["filename"].endswith(".pptx")), None
+            )
+            if pptx_file:
+                response_data["pptx_url"] = f"/outputs/{pptx_file['relative_path']}"
+
             if pdf_file:
                 if output_type == "slides":
                     response_data["ppt_url"] = f"/outputs/{pdf_file['relative_path']}"
